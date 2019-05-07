@@ -1,0 +1,17 @@
+{
+  "buildFiles": [
+    "/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Android.mk",
+    "/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Application.mk"
+  ],
+  "cleanCommands": [
+    "/Users/yangjianjun/Library/Android/sdk/ndk-bundle/ndk-build NDK_PROJECT_PATH\u003dnull APP_BUILD_SCRIPT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Android.mk NDK_APPLICATION_MK\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Application.mk APP_ABI\u003dx86 NDK_ALL_ABIS\u003dx86 NDK_DEBUG\u003d1 APP_PLATFORM\u003dandroid-16 NDK_OUT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/obj NDK_LIBS_OUT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/lib clean"
+  ],
+  "libraries": {
+    "diff-utils-debug-x86": {
+      "artifactName": "diff-utils",
+      "buildCommand": "/Users/yangjianjun/Library/Android/sdk/ndk-bundle/ndk-build NDK_PROJECT_PATH\u003dnull APP_BUILD_SCRIPT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Android.mk NDK_APPLICATION_MK\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/src/main/jni/Application.mk APP_ABI\u003dx86 NDK_ALL_ABIS\u003dx86 NDK_DEBUG\u003d1 APP_PLATFORM\u003dandroid-16 NDK_OUT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/obj NDK_LIBS_OUT\u003d/Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/lib /Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/obj/local/x86/libdiff-utils.so",
+      "abi": "x86",
+      "output": "/Users/yangjianjun/work/source/Learn/BsDiffLibrary/build/intermediates/ndkBuild/debug/obj/local/x86/libdiff-utils.so"
+    }
+  }
+}

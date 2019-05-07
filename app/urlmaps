@@ -1,0 +1,52 @@
+
+
+
+目录为当前app的data目录下，
+/data/pacakgename/offlinepackage/infolist.json
+/**
+ appKey：应用ID
+ version：离线包版本信息
+ url:下载地址
+ status:当前离线包状态
+ businessId:业务Id，离线包最终会下载该businessId下
+**/
+{
+  "appKey":appKey，
+  "packages":[
+    {
+    "businessId":"aaaaa",
+    "version":"version"
+    "url":"downloadUrl"
+    "status":1
+    }
+  ]
+}
+
+/**
+business下index.json文件
+*/
+{
+  "appKey":appKey，
+  "version":"1.0",
+  "business":"test",
+  "resources":[
+    {
+    "url":"原始资源url",
+    "path":"资源相对路径",
+    "status":1//是否需要更新，1需要更新，0不更新
+    }
+  ]
+}
+/data/pacakgename/offlinepackage/businessId/work/index.txt: 工作目录索引文件
+/data/pacakgename/offlinepackage/businessId/work/资源文件:资源文件
+/data/pacakgename/offlinepackage/businessId/current.zip 现有离线包压缩包
+/data/pacakgename/offlinepackage/businessId/update.zip 即将更新的压缩包
+
+
+暂时先不支持的增量更新
+/data/pacakgename/offlinepackage/businessId/newDiff.zip 即将更新的离线压缩包
+/data/pacakgename/offlinepackage/businessId/merge.zip diff合并后的离线压缩包
+
+
+index.txt:
+https://www.baidu.com path

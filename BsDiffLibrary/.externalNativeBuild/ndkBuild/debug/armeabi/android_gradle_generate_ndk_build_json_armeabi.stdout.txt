@@ -1,0 +1,1 @@
+Android NDK: INTERNAL ERROR: The armeabi ABI should have exactly one architecture definitions. Found: ''    
