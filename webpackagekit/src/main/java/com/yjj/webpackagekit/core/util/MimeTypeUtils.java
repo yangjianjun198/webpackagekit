@@ -16,6 +16,7 @@ public class MimeTypeUtils {
         supportMineTypeList.add("image/tiff");
         supportMineTypeList.add("text/css");
         supportMineTypeList.add("image/gif");
+        supportMineTypeList.add("image/png");
     }
 
     public static boolean checkIsSupportMimeType(String mimeType) {

@@ -5,7 +5,6 @@ package com.yjj.webpackagekit.core;
  * 离线包状态信息
  */
 public class PackageStatus {
-    public final static int INIT = 1;
-    public final static int DOWNLOADED = 2;
-    public final static int UPDATED = 3;
+    public final static int onLine = 1;
+    public final static int offLine = 0;
 }

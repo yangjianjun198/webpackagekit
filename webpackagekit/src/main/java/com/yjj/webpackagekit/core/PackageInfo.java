@@ -68,6 +68,10 @@ public class PackageInfo {
         this.packageId = packageId;
     }
 
+    public void setStatus(int status) {
+        this.status = status;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof PackageInfo)) {

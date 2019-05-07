@@ -1,11 +1,15 @@
 package com.yjj.webpackagekit;
 
 import android.graphics.Bitmap;
+import android.os.Build;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import com.yjj.webpackagekit.core.util.Logger;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * created by yangjianjun on 2018/9/26
@@ -21,7 +25,7 @@ public class OfflineWebViewClient extends WebViewClient {
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
         Logger.d("shouldInterceptRequest before" + url);
-        WebResourceResponse resourceResponse = PackageManager.getInstance().getResource(url);
+        WebResourceResponse resourceResponse = getWebResourceResponse(url);
         if (resourceResponse == null) {
             if (delegate != null) {
                 return delegate.shouldInterceptRequest(view, url);
@@ -38,6 +42,16 @@ public class OfflineWebViewClient extends WebViewClient {
             return delegate.shouldOverrideUrlLoading(view, url);
         }
         return super.shouldOverrideUrlLoading(view, url);
+    }
+
+    /**
+     * 获取资源
+     *
+     * @param url 资源地址
+     */
+    private WebResourceResponse getWebResourceResponse(String url) {
+        WebResourceResponse resourceResponse = PackageManager.getInstance().getResource(url);
+        return resourceResponse;
     }
 
     @Override

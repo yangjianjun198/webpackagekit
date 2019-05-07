@@ -12,6 +12,7 @@ import com.yjj.webpackagekit.core.Downloader;
 import com.yjj.webpackagekit.core.PackageEntity;
 import com.yjj.webpackagekit.core.PackageInfo;
 import com.yjj.webpackagekit.core.PackageInstaller;
+import com.yjj.webpackagekit.core.PackageStatus;
 import com.yjj.webpackagekit.core.ResourceManager;
 import com.yjj.webpackagekit.core.util.FileUtils;
 import com.yjj.webpackagekit.core.util.GsonUtils;
@@ -46,6 +47,7 @@ public class PackageManager {
     private volatile boolean isInstalled = false;
     private Handler packageHandler;
     private HandlerThread packageThread;
+    private PackageEntity localPackageEntity;
     /**
      * 即将下载的packageInfoList
      */
@@ -105,7 +107,6 @@ public class PackageManager {
         if (!packageIndexFile.exists()) {
             isFirstLoadPackage = true;
         }
-
         PackageEntity netEntity = null;
         netEntity = GsonUtils.fromJsonIgnoreException(packageStr, PackageEntity.class);
         willDownloadPackageInfoList = new CopyOnWriteArrayList<>();
@@ -116,35 +117,18 @@ public class PackageManager {
          * 不是第一次Load package
          */
         if (!isFirstLoadPackage) {
-            FileInputStream indexFis = null;
-            try {
-                indexFis = new FileInputStream(packageIndexFile);
-            } catch (FileNotFoundException e) {
-
-            }
-            if (indexFis == null) {
-                return;
-            }
-            PackageEntity localEntity = GsonUtils.fromJsonIgnoreException(indexFis, PackageEntity.class);
-            if (localEntity == null) {
-                return;
-            }
-            int index = 0;
-            for (PackageInfo packageInfo : localEntity.getItems()) {
-                if ((index = willDownloadPackageInfoList.indexOf(packageInfo)) >= 0) {
-                    PackageInfo info = willDownloadPackageInfoList.get(index);
-                    if (VersionUtils.compareVersion(info.getVersion(), packageInfo.getVersion()) <= 0) {
-                        willDownloadPackageInfoList.remove(index);
-                        if (onlyUpdatePackageInfoList == null) {
-                            onlyUpdatePackageInfoList = new CopyOnWriteArrayList<>();
-                        }
-                        onlyUpdatePackageInfoList.add(packageInfo);
-                    } else {
-                        packageInfo.setVersion(info.getVersion());
-                    }
-                }
-            }
+            initLocalEntity(packageIndexFile);
         }
+        List<PackageInfo> packageInfoList = new ArrayList<>(willDownloadPackageInfoList.size());
+        for (PackageInfo packageInfo : willDownloadPackageInfoList) {
+            if (packageInfo.getStatus() == PackageStatus.offLine) {
+                continue;
+            }
+            packageInfoList.add(packageInfo);
+        }
+        willDownloadPackageInfoList.clear();
+        willDownloadPackageInfoList.addAll(packageInfoList);
+
         for (PackageInfo packageInfo : willDownloadPackageInfoList) {
             Downloader downloader = new DownloaderImpl(context);
             downloader.download(packageInfo, new DownloadCallback(this));
@@ -155,6 +139,42 @@ public class PackageManager {
                 resourceManager.updateResource(packageInfo.getPackageId());
                 updateIndexFile(packageInfo.getPackageId(), packageInfo.getVersion());
                 isInstalled = true;
+            }
+        }
+    }
+
+    private void initLocalEntity(File packageIndexFile) {
+        FileInputStream indexFis = null;
+        try {
+            indexFis = new FileInputStream(packageIndexFile);
+        } catch (FileNotFoundException e) {
+
+        }
+        if (indexFis == null) {
+            return;
+        }
+        localPackageEntity = GsonUtils.fromJsonIgnoreException(indexFis, PackageEntity.class);
+        if (localPackageEntity == null || localPackageEntity.getItems() == null) {
+            return;
+        }
+        int index = 0;
+        for (PackageInfo localInfo : localPackageEntity.getItems()) {
+            if ((index = willDownloadPackageInfoList.indexOf(localInfo)) < 0) {
+                continue;
+            }
+            PackageInfo info = willDownloadPackageInfoList.get(index);
+            if (VersionUtils.compareVersion(info.getVersion(), localInfo.getVersion()) <= 0) {
+                willDownloadPackageInfoList.remove(index);
+                if (onlyUpdatePackageInfoList == null) {
+                    onlyUpdatePackageInfoList = new CopyOnWriteArrayList<>();
+                }
+                if (info.getStatus() == PackageStatus.onLine) {
+                    onlyUpdatePackageInfoList.add(localInfo);
+                }
+                localInfo.setStatus(info.getStatus());
+            } else {
+                localInfo.setStatus(info.getStatus());
+                localInfo.setVersion(info.getVersion());
             }
         }
     }
@@ -173,35 +193,39 @@ public class PackageManager {
                 return;
             }
         }
-        FileInputStream indexFis = null;
-        try {
-            indexFis = new FileInputStream(packageIndexFile);
-        } catch (FileNotFoundException e) {
+        if (localPackageEntity == null) {
+            FileInputStream indexFis = null;
+            try {
+                indexFis = new FileInputStream(packageIndexFile);
+            } catch (FileNotFoundException e) {
 
+            }
+            if (indexFis == null) {
+                return;
+            }
+            localPackageEntity = GsonUtils.fromJsonIgnoreException(indexFis, PackageEntity.class);
         }
-        if (indexFis == null) {
-            return;
-        }
-        PackageEntity localEntity = GsonUtils.fromJsonIgnoreException(indexFis, PackageEntity.class);
-        if (localEntity == null) {
-            localEntity = new PackageEntity();
+        if (localPackageEntity == null) {
+            localPackageEntity = new PackageEntity();
         }
         List<PackageInfo> packageInfoList = new ArrayList<>(2);
-        if (localEntity.getItems() == null) {
-            localEntity.setItems(packageInfoList);
-        } else {
-            packageInfoList = localEntity.getItems();
+        if (localPackageEntity.getItems() != null) {
+            packageInfoList.addAll(localPackageEntity.getItems());
         }
         PackageInfo packageInfo = new PackageInfo();
         packageInfo.setPackageId(packageId);
         if (packageInfoList.indexOf(packageInfo) >= 0) {
             packageInfo.setVersion(version);
         } else {
+            packageInfo.setStatus(PackageStatus.onLine);
             packageInfo.setVersion(version);
             packageInfoList.add(packageInfo);
         }
-
-        String updateStr = new Gson().toJson(localEntity);
+        if (localPackageEntity == null || localPackageEntity.getItems() == null
+            || localPackageEntity.getItems().size() == 0) {
+            return;
+        }
+        String updateStr = new Gson().toJson(localPackageEntity);
         try {
             FileOutputStream outputStream = new FileOutputStream(packageIndexFile);
             try {

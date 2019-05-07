@@ -1,6 +1,7 @@
 package com.yjj.webpackagekit.inner;
 
 import android.content.Context;
+import android.os.Build;
 import android.text.TextUtils;
 import android.webkit.WebResourceResponse;
 
@@ -52,7 +53,15 @@ public class ResourceManagerImpl implements ResourceManager {
             Logger.d("getResource [" + url + "]" + " inputStream is null");
             return null;
         }
-        WebResourceResponse response = new WebResourceResponse(resourceInfo.getMimeType(), "UTF-8", inputStream);
+        WebResourceResponse response;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Map<String, String> header = new HashMap<>(2);
+            header.put("Access-Control-Allow-Origin", "*");
+            header.put("Access-Control-Allow-Headers", "Content-Type");
+            response = new WebResourceResponse(resourceInfo.getMimeType(), "UTF-8", 200, "ok", header, inputStream);
+        } else {
+            response = new WebResourceResponse(resourceInfo.getMimeType(), "UTF-8", inputStream);
+        }
         return response;
     }
 
