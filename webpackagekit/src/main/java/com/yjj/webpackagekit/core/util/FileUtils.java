@@ -3,17 +3,17 @@ package com.yjj.webpackagekit.core.util;
 import android.content.Context;
 import android.os.Environment;
 import android.text.TextUtils;
-import android.util.Log;
 
 import com.yjj.webpackagekit.core.Contants;
 
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.channels.FileChannel;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -57,43 +57,173 @@ public class FileUtils {
      *
      * @param zipFileString ZIP的名称
      * @param outPathString 要解压缩路径
-     * @throws Exception
      */
-    public static void unZipFolder(String zipFileString, String outPathString) throws Exception {
-        ZipInputStream inZip = new ZipInputStream(new FileInputStream(zipFileString));
-        ZipEntry zipEntry;
-        String szName = "";
-        while ((zipEntry = inZip.getNextEntry()) != null) {
+    public static boolean unZipFolder(String zipFileString, String outPathString) {
+        ZipInputStream inZip = deleteOutUnZipFileIfNeed(zipFileString, outPathString);
+        if (inZip == null) {
+            return false;
+        }
+        boolean isSuccess = true;
+        ZipEntry zipEntry = null;
+        zipEntry = readZipNextZipEntry(inZip);
+        if (zipEntry == null) {
+            return false;
+        }
+        String szName;
+        while (zipEntry != null) {
             szName = zipEntry.getName();
+            /**
+             * 不是package开头，认为是无效数据
+             */
+            if (!szName.startsWith(Contants.RESOURCE_MIDDLE_PATH)) {
+                zipEntry = readZipNextZipEntry(inZip);
+                continue;
+            }
             if (zipEntry.isDirectory()) {
-                //获取部件的文件夹名
                 szName = szName.substring(0, szName.length() - 1);
                 File folder = new File(outPathString + File.separator + szName);
-                folder.mkdirs();
+                isSuccess = folder.mkdirs();
+                if (!isSuccess) {
+                    break;
+                }
             } else {
-                Log.e(TAG, outPathString + File.separator + szName);
                 File file = new File(outPathString + File.separator + szName);
                 if (!file.exists()) {
-                    Log.e(TAG, "Create the file:" + outPathString + File.separator + szName);
-                    file.getParentFile().mkdirs();
-                    file.createNewFile();
+                    isSuccess = makeUnZipFile(outPathString, szName);
                 }
-                // 获取文件的输出流
-                FileOutputStream out = new FileOutputStream(file);
-                int len;
-                byte[] buffer = new byte[1024];
-                // 读取（字节）字节到缓冲区
-                while ((len = inZip.read(buffer)) != -1) {
-                    // 从缓冲区（0）位置写入（字节）字节
-                    out.write(buffer, 0, len);
-                    out.flush();
+                if (!isSuccess) {
+                    break;
                 }
-                out.close();
+                isSuccess = writeUnZipFileToFile(inZip, file);
             }
+            if (!isSuccess) {
+                break;
+            }
+            zipEntry = readZipNextZipEntry(inZip);
         }
-        inZip.close();
+        try {
+            inZip.close();
+        } catch (IOException e) {
+            isSuccess = false;
+        }
+        return isSuccess;
     }
 
+    private static ZipInputStream deleteOutUnZipFileIfNeed(String zipFileString, String outPathString) {
+        boolean isSuccess = true;
+        ZipInputStream inZip = null;
+        try {
+            inZip = new ZipInputStream(new FileInputStream(zipFileString));
+        } catch (FileNotFoundException e) {
+            isSuccess = false;
+        }
+        if (!isSuccess) {
+            return null;
+        }
+        File outPath = new File(outPathString);
+        if (outPath.exists()) {
+            isSuccess = deleteDir(outPath);
+        }
+        if (!isSuccess) {
+            return null;
+        }
+        return inZip;
+    }
+
+    private static boolean makeUnZipFile(String outPathString, String szName) {
+        boolean isSuccess = true;
+        File file = new File(outPathString + File.separator + szName);
+        if (file.getParentFile() != null && !file.getParentFile().exists()) {
+            isSuccess = file.getParentFile().mkdirs();
+        }
+        if (!isSuccess) {
+            return false;
+        }
+        try {
+            isSuccess = file.createNewFile();
+        } catch (IOException e) {
+            isSuccess = false;
+        }
+        return isSuccess;
+    }
+
+    /**
+     * 读取zip数据，如果抛出异常返回-2
+     */
+    private static int readZipFile(ZipInputStream inZip, byte[] buffer) {
+        int len = -1;
+        try {
+            len = inZip.read(buffer);
+        } catch (IOException e) {
+            len = -2;
+        }
+        return len;
+    }
+
+    private static ZipEntry readZipNextZipEntry(ZipInputStream inZip) {
+        ZipEntry zipEntry = null;
+        boolean isSuccess = true;
+        try {
+            zipEntry = inZip.getNextEntry();
+        } catch (IOException e) {
+            isSuccess = false;
+        }
+        if (!isSuccess) {
+            return null;
+        }
+        return zipEntry;
+    }
+
+    private static boolean writeUnZipFileToFile(ZipInputStream inZip, File file) {
+        boolean isSuccess = true;
+        // 获取文件的输出流
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream(file);
+        } catch (FileNotFoundException e) {
+            isSuccess = false;
+        }
+        int len = -1;
+        byte[] buffer = new byte[1024];
+        len = readZipFile(inZip, buffer);
+        if (len == -1) {
+            isSuccess = false;
+        }
+        if (!isSuccess) {
+            return false;
+        }
+        // 读取（字节）字节到缓冲区
+        while (len != -1) {
+            // 从缓冲区（0）位置写入（字节）字节
+            try {
+                out.write(buffer, 0, len);
+            } catch (IOException e) {
+                isSuccess = false;
+            }
+            if (!isSuccess) {
+                break;
+            }
+            try {
+                out.flush();
+            } catch (IOException e) {
+                isSuccess = false;
+            }
+            if (!isSuccess) {
+                break;
+            }
+            len = readZipFile(inZip, buffer);
+            if (len == -2) {
+                isSuccess = false;
+                break;
+            }
+        }
+        try {
+            out.close();
+        } catch (IOException e) {
+
+        }
+        return isSuccess;
+    }
 
     /**
      * 获取缓存目录
@@ -111,6 +241,13 @@ public class FileUtils {
             appCacheDir = new File(cacheDirPath);
         }
         return appCacheDir;
+    }
+
+    public static File getResourceIndexFile(Context context, String packageId) {
+        String indexPath =
+            getPackageWorkName(context, packageId) + File.separator + Contants.RESOURCE_MIDDLE_PATH + File.separator
+                + Contants.RESOURCE_INDEX_NAME;
+        return new File(indexPath);
     }
 
     private static File getExternalCacheDir(Context context) {
@@ -142,7 +279,7 @@ public class FileUtils {
      * 获取根容器的地址
      */
     public static String getPackageRootPath(Context context) {
-        File fileDir = getFileDirectory(context, true);
+        File fileDir = getFileDirectory(context, false);
         if (fileDir == null) {
             return null;
         }
@@ -242,23 +379,18 @@ public class FileUtils {
      */
     public static boolean copyFileCover(String srcFileName, String descFileName) {
         File srcFile = new File(srcFileName);
-        // 判断源文件是否存在
         if (!srcFile.exists()) {
             return false;
-        }
-        // 判断源文件是否是合法的文件
-        else if (!srcFile.isFile()) {
+        } else if (!srcFile.isFile()) {
             return false;
         }
         File descFile = new File(descFileName);
-        // 判断目标文件是否存在
         if (descFile.exists()) {
             if (!FileUtils.delFile(descFileName)) {
                 return false;
             }
         } else if (descFile.getParentFile() != null) {
             if (!descFile.getParentFile().exists()) {
-                // 如果目标文件所在的目录不存在，则创建目录
                 if (!descFile.getParentFile().mkdirs()) {
                     return false;
                 }
@@ -266,42 +398,13 @@ public class FileUtils {
         } else {
             return false;
         }
-
-        // 准备复制文件
-        // 读取的位数
-        int readByte = 0;
-        InputStream ins = null;
-        OutputStream outs = null;
+        boolean isSuccess;
         try {
-            // 打开源文件
-            ins = new FileInputStream(srcFile);
-            // 打开目标文件的输出流
-            outs = new FileOutputStream(descFile);
-            byte[] buf = new byte[1024];
-            // 一次读取1024个字节，当readByte为-1时表示文件已经读取完毕
-            while ((readByte = ins.read(buf)) != -1) {
-                // 将读取的字节流写入到输出流
-                outs.write(buf, 0, readByte);
-            }
-            return true;
+            isSuccess = copyFileByChannel(srcFile, descFile);
+            return isSuccess;
         } catch (Exception e) {
             return false;
         } finally {
-            // 关闭输入输出流，首先关闭输出流，然后再关闭输入流
-            if (outs != null) {
-                try {
-                    outs.close();
-                } catch (IOException oute) {
-                    oute.printStackTrace();
-                }
-            }
-            if (ins != null) {
-                try {
-                    ins.close();
-                } catch (IOException ine) {
-                    ine.printStackTrace();
-                }
-            }
         }
     }
 
@@ -336,53 +439,6 @@ public class FileUtils {
         }
     }
 
-    /**
-     * 复制目录
-     * @param srcFile
-     * @param dstFile
-     * @return
-     */
-    public static boolean copyDir(String srcFile, String dstFile) {
-        // 地址相等不复制
-        if (TextUtils.equals(srcFile, dstFile)) {
-            return true;
-        }
-        FileInputStream fis = null;
-        FileOutputStream fos = null;
-        try {
-            File dst = new File(dstFile);
-            if (!dst.getParentFile().exists()) {
-                if (!dst.getParentFile().mkdirs()) {
-                    return false;
-                }
-            }
-            fis = new FileInputStream(srcFile);
-            fos = new FileOutputStream(dstFile);
-            byte[] buffer = new byte[1024];
-            int len;
-            while ((len = fis.read(buffer)) != -1) {
-                fos.write(buffer, 0, len);
-            }
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (fis != null) {
-                try {
-                    fis.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (fos != null) {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                }
-            }
-        }
-        return true;
-    }
-
     public static boolean makeDir(String path) {
         File file = new File(path);
         if (!file.exists()) {
@@ -391,4 +447,102 @@ public class FileUtils {
         return true;
     }
 
+    /**
+     * 复制某个目录及目录下的所有子目录和文件到新文件夹
+     *
+     * @param oldPath 源文件夹路径
+     * @param newPath 目标文件夹路径
+     */
+    public static boolean copyFolder(String oldPath, String newPath) {
+        boolean isSuccess = true;
+        try {
+            File newFile = new File(newPath);
+            if (newFile.exists()) {
+                isSuccess = deleteDir(newFile);
+            }
+            if (!isSuccess) {
+                return false;
+            }
+            isSuccess = newFile.mkdirs();
+            if (!isSuccess) {
+                return false;
+            }
+            File fileList = new File(oldPath);
+            String[] file = fileList.list();
+            File tempFile;
+            for (String itemFile : file) {
+                // 如果oldPath以路径分隔符/或者\结尾，那么则oldPath/文件名就可以了
+                // 否则要自己oldPath后面补个路径分隔符再加文件名
+                if (oldPath.endsWith(File.separator)) {
+                    tempFile = new File(oldPath + itemFile);
+                } else {
+                    tempFile = new File(oldPath + File.separator + itemFile);
+                }
+
+                if (tempFile.isFile()) {
+                    isSuccess = copyFileByChannel(tempFile, new File(newPath + File.separator + tempFile.getName()));
+                }
+                if (!isSuccess) {
+                    break;
+                }
+                if (tempFile.isDirectory()) {
+                    isSuccess = copyFolder(oldPath + File.separator + itemFile, newPath + File.separator + itemFile);
+                }
+                if (!isSuccess) {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+
+        }
+        return isSuccess;
+    }
+
+    public static boolean copyFileByChannel(File src, File dest) {
+        FileInputStream fi = null;
+        FileOutputStream fo = null;
+        FileChannel in = null;
+        FileChannel out = null;
+        boolean isSuccess = true;
+        try {
+            fi = new FileInputStream(src);
+            fo = new FileOutputStream(dest);
+            in = fi.getChannel();
+            out = fo.getChannel();
+            in.transferTo(0, in.size(), out);
+        } catch (IOException e) {
+            isSuccess = false;
+        } finally {
+            try {
+                fi.close();
+                in.close();
+                fo.close();
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return isSuccess;
+    }
+
+    /**
+     * 删除某个目录及目录下的所有子目录和文件
+     *
+     * @param dir File path
+     * @return boolean
+     */
+    public static boolean deleteDir(File dir) {
+        if (dir.isDirectory()) {
+            String[] children = dir.list();
+            if (children != null) {
+                for (String aChildren : children) {
+                    boolean isDelete = deleteDir(new File(dir, aChildren));
+                    if (!isDelete) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return dir.delete();
+    }
 }

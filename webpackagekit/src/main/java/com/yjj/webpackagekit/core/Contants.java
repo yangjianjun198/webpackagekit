@@ -39,15 +39,16 @@ public class Contants {
 
     /**
      * 下载文件名称
-     *
      */
     public static final String PACKAGE_DOWNLOAD = "download.zip";
 
-
     /**
      * merge路径
-     *
      */
     public static final String PACKAGE_MERGE = "merge.zip";
 
+    /**
+     * 中间路径
+     */
+    public static final String RESOURCE_MIDDLE_PATH = "package";
 }

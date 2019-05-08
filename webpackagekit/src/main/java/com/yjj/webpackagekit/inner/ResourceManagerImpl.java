@@ -13,6 +13,7 @@ import com.yjj.webpackagekit.core.ResourceManager;
 import com.yjj.webpackagekit.core.util.FileUtils;
 import com.yjj.webpackagekit.core.util.GsonUtils;
 import com.yjj.webpackagekit.core.util.Logger;
+import com.yjj.webpackagekit.core.util.MD5Utils;
 import com.yjj.webpackagekit.core.util.MimeTypeUtils;
 
 import java.io.File;
@@ -23,6 +24,9 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * created by yangjianjun on 2018/10/25
@@ -31,16 +35,28 @@ import java.util.Map;
 public class ResourceManagerImpl implements ResourceManager {
     private Map<ResourceKey, ResourceInfo> resourceInfoMap;
     private Context context;
+    private Lock lock;
 
     public ResourceManagerImpl(Context context) {
-        resourceInfoMap = new HashMap<>();
+        resourceInfoMap = new ConcurrentHashMap<>(16);
         this.context = context;
+        lock = new ReentrantLock();
     }
 
+    /**
+     * 获取资源信息
+     * 会做md5校验
+     * @param url 请求地址
+     * @return
+     */
     @Override
     public WebResourceResponse getResource(String url) {
         ResourceKey key = new ResourceKey(url);
+        if (!lock.tryLock()) {
+            return null;
+        }
         ResourceInfo resourceInfo = resourceInfoMap.get(key);
+        lock.unlock();
         if (resourceInfo == null) {
             return null;
         }
@@ -52,6 +68,27 @@ public class ResourceManagerImpl implements ResourceManager {
         if (inputStream == null) {
             Logger.d("getResource [" + url + "]" + " inputStream is null");
             return null;
+        }
+        String rMd5 = resourceInfo.getMd5();
+        if (!TextUtils.isEmpty(rMd5) && !MD5Utils.checkMD5(rMd5, new File(resourceInfo.getLocalPath()))) {
+            safeRemoveResource(key);
+            return null;
+        }
+        /**
+         * 没有配置md5做简单的校验
+         */
+        if (TextUtils.isEmpty(rMd5)) {
+            int size = 0;
+            try {
+                size = inputStream.available();
+            } catch (IOException e) {
+
+            }
+            if (size == 0) {
+                Logger.e("resource file is error ");
+                safeRemoveResource(key);
+                return null;
+            }
         }
         WebResourceResponse response;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -65,11 +102,19 @@ public class ResourceManagerImpl implements ResourceManager {
         return response;
     }
 
+    private void safeRemoveResource(ResourceKey key) {
+        if (lock.tryLock()) {
+            resourceInfoMap.remove(key);
+            lock.unlock();
+        }
+    }
+
     @Override
     public boolean updateResource(String packageId) {
         boolean isSuccess = false;
         String indexFileName =
-            FileUtils.getPackageWorkName(context, packageId) + File.separator + Contants.RESOURCE_INDEX_NAME;
+            FileUtils.getPackageWorkName(context, packageId) + File.separator + Contants.RESOURCE_MIDDLE_PATH
+                + File.separator + Contants.RESOURCE_INDEX_NAME;
         Logger.d("updateResource indexFileName: " + indexFileName);
         File indexFile = new File(indexFileName);
         if (!indexFile.exists()) {
@@ -114,8 +159,11 @@ public class ResourceManagerImpl implements ResourceManager {
             }
             String path = resourceInfo.getPath();
             path = path.startsWith(File.separator) ? path.substring(1) : path;
-            resourceInfo.setLocalPath(workPath + File.separator + path);
+            resourceInfo.setLocalPath(
+                workPath + File.separator + Contants.RESOURCE_MIDDLE_PATH + File.separator + path);
+            lock.lock();
             resourceInfoMap.put(new ResourceKey(resourceInfo.getRemoteUrl()), resourceInfo);
+            lock.unlock();
         }
         return isSuccess;
     }

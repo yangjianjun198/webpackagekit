@@ -56,7 +56,6 @@ public class PackageInstallerImpl implements PackageInstaller {
         if (!isSuccess) {
             return false;
         }
-        FileUtils.delFile(downloadFile);
 
         /***
          * 复制zip
@@ -76,7 +75,7 @@ public class PackageInstallerImpl implements PackageInstaller {
          * */
         String updatePath = updateFile.substring(0, updateFile.indexOf(".zip"));
         try {
-            FileUtils.unZipFolder(updateFile, updatePath);
+            isSuccess = FileUtils.unZipFolder(updateFile, updatePath);
         } catch (Exception e) {
             isSuccess = false;
         }
@@ -89,9 +88,10 @@ public class PackageInstallerImpl implements PackageInstaller {
          * 解压成功，覆盖work下的内容
          */
         String workPath = FileUtils.getPackageWorkName(context, packageInfo.getPackageId());
-        isSuccess = FileUtils.copyDir(updatePath, workPath);
+        isSuccess = FileUtils.copyFolder(updatePath, workPath);
         if (isSuccess) {
-            FileUtils.delFile(updatePath);
+            FileUtils.deleteDir(new File(updatePath));
+            FileUtils.deleteFile(willCopyFile);
         }
         return isSuccess;
     }

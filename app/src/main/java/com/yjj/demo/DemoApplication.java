@@ -16,7 +16,10 @@ public class DemoApplication extends Application {
     }
 
     private String getPackageInfo() {
-        return "{\n" + "\t\"items\":[\n" + "\t\t{\n" + "\t\t\t\"packageId\":\"122\",\n"
-            + "\t\t\t\"downloadUrl\":\"738738.zip\",\n" + "\t\t\t\"isPatch\":false\n" + "\t\t}\n" + "\t]\n" + "}";
+        return "";
+    }
+
+    private String getPackageInfoPatch() {
+        return "";
     }
 }

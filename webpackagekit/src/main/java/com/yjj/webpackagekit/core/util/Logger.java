@@ -20,4 +20,10 @@ public class Logger {
             Log.e(TAG, msg);
         }
     }
+
+    public static void w(String msg) {
+        if (DEBUG) {
+            Log.w(TAG, msg);
+        }
+    }
 }

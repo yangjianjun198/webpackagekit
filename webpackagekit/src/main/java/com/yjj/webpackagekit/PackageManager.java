@@ -8,6 +8,7 @@ import android.os.Message;
 import android.webkit.WebResourceResponse;
 
 import com.google.gson.Gson;
+import com.liulishuo.filedownloader.FileDownloader;
 import com.yjj.webpackagekit.core.Downloader;
 import com.yjj.webpackagekit.core.PackageEntity;
 import com.yjj.webpackagekit.core.PackageInfo;
@@ -16,6 +17,7 @@ import com.yjj.webpackagekit.core.PackageStatus;
 import com.yjj.webpackagekit.core.ResourceManager;
 import com.yjj.webpackagekit.core.util.FileUtils;
 import com.yjj.webpackagekit.core.util.GsonUtils;
+import com.yjj.webpackagekit.core.util.Logger;
 import com.yjj.webpackagekit.core.util.MD5Utils;
 import com.yjj.webpackagekit.core.util.VersionUtils;
 import com.yjj.webpackagekit.inner.DownloaderImpl;
@@ -29,7 +31,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * created by yangjianjun on 2018/10/24
@@ -72,6 +73,7 @@ public class PackageManager {
         this.context = context;
         resourceManager = new ResourceManagerImpl(context);
         packageInstaller = new PackageInstallerImpl(context);
+        FileDownloader.init(context);
     }
 
     /**
@@ -97,6 +99,11 @@ public class PackageManager {
         packageHandler.sendMessage(message);
     }
 
+    /**
+     * package thread执行
+     *
+     * @param packageStr json 字符串
+     */
     private void performUpdate(String packageStr) {
         String packageIndexFileName = FileUtils.getPackageIndexFileName(context);
         File packageIndexFile = new File(packageIndexFileName);
@@ -109,7 +116,7 @@ public class PackageManager {
         }
         PackageEntity netEntity = null;
         netEntity = GsonUtils.fromJsonIgnoreException(packageStr, PackageEntity.class);
-        willDownloadPackageInfoList = new CopyOnWriteArrayList<>();
+        willDownloadPackageInfoList = new ArrayList<>(2);
         if (netEntity != null && netEntity.getItems() != null) {
             willDownloadPackageInfoList.addAll(netEntity.getItems());
         }
@@ -164,9 +171,12 @@ public class PackageManager {
             }
             PackageInfo info = willDownloadPackageInfoList.get(index);
             if (VersionUtils.compareVersion(info.getVersion(), localInfo.getVersion()) <= 0) {
+                if (!checkResourceFileValid(info.getPackageId())) {
+                    return;
+                }
                 willDownloadPackageInfoList.remove(index);
                 if (onlyUpdatePackageInfoList == null) {
-                    onlyUpdatePackageInfoList = new CopyOnWriteArrayList<>();
+                    onlyUpdatePackageInfoList = new ArrayList<>(2);
                 }
                 if (info.getStatus() == PackageStatus.onLine) {
                     onlyUpdatePackageInfoList.add(localInfo);
@@ -177,6 +187,11 @@ public class PackageManager {
                 localInfo.setVersion(info.getVersion());
             }
         }
+    }
+
+    private boolean checkResourceFileValid(String packageId) {
+        File indexFile = FileUtils.getResourceIndexFile(context, packageId);
+        return indexFile.exists() && indexFile.isFile();
     }
 
     private void updateIndexFile(String packageId, String version) {
@@ -221,6 +236,7 @@ public class PackageManager {
             packageInfo.setVersion(version);
             packageInfoList.add(packageInfo);
         }
+        localPackageEntity.setItems(packageInfoList);
         if (localPackageEntity == null || localPackageEntity.getItems() == null
             || localPackageEntity.getItems().size() == 0) {
             return;
@@ -231,6 +247,7 @@ public class PackageManager {
             try {
                 outputStream.write(updateStr.getBytes());
             } catch (IOException ignore) {
+                Logger.e("write packageIndex file error");
             } finally {
                 if (outputStream != null) {
                     try {
@@ -241,11 +258,13 @@ public class PackageManager {
                 }
             }
         } catch (Exception ignore) {
+            Logger.e("read packageIndex file error");
         }
     }
 
     public WebResourceResponse getResource(String url) {
         if (!isInstalled) {
+            Logger.w("get resource is error for package not install");
             return null;
         }
         return resourceManager.getResource(url);
@@ -277,20 +296,20 @@ public class PackageManager {
         }
         PackageInfo packageInfo = null;
         boolean isDownloadAll;
-        synchronized (willDownloadPackageInfoList) {
-            int pos = willDownloadPackageInfoList.indexOf(packageId);
-            if (pos >= 0) {
-                packageInfo = willDownloadPackageInfoList.remove(pos);
-            }
-            isDownloadAll = willDownloadPackageInfoList.size() == 0;
+        PackageInfo tmp = new PackageInfo();
+        tmp.setPackageId(packageId);
+        int pos = willDownloadPackageInfoList.indexOf(tmp);
+        if (pos >= 0) {
+            packageInfo = willDownloadPackageInfoList.remove(pos);
         }
+        isDownloadAll = willDownloadPackageInfoList.size() == 0;
         /**
          * 安装
          * */
         if (packageInfo != null) {
-            String downloadFile = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
-            File downloadFilePath = new File(downloadFile);
-            if (downloadFilePath.exists() && !MD5Utils.checkMD5(packageInfo.getMd5(), downloadFilePath)) {
+            String downloadFilePath = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
+            File downloadFile = new File(downloadFilePath);
+            if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
                 boolean isSuccess = packageInstaller.install(packageInfo);
                 if (isSuccess) {
                     resourceManager.updateResource(packageInfo.getPackageId());
@@ -315,6 +334,7 @@ public class PackageManager {
 
     /**
      * 处理离线下载失败
+     * 在package thread中执行
      *
      * @param packageId 离线包id
      */
@@ -323,12 +343,11 @@ public class PackageManager {
             return;
         }
         boolean isDownloadAll;
-        synchronized (willDownloadPackageInfoList) {
-            int pos = willDownloadPackageInfoList.indexOf(packageId);
+        int pos = willDownloadPackageInfoList.indexOf(packageId);
+        if (pos >= 0) {
             willDownloadPackageInfoList.remove(pos);
-            isDownloadAll = willDownloadPackageInfoList.size() == 0;
         }
-
+        isDownloadAll = willDownloadPackageInfoList.size() == 0;
         if (isDownloadAll && onlyUpdatePackageInfoList != null) {
             for (PackageInfo packageInfo1 : onlyUpdatePackageInfoList) {
                 resourceManager.updateResource(packageInfo1.getPackageId());

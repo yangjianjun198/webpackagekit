@@ -61,7 +61,7 @@ public class ResourceKey {
         }
         boolean isEqual = true;
         for (String pa : pathList) {
-            if (!that.pathList.contains(isEqual)) {
+            if (!that.pathList.contains(pa)) {
                 isEqual = false;
                 break;
             }

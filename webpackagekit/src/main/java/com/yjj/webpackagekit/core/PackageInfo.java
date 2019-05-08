@@ -19,12 +19,12 @@ public class PackageInfo {
      *
      * 离线包版本号
      * */
-    private String version;
+    private String version = "1.0";
 
     /***
      * 离线包的状态 {@link PackageStatus}
      * */
-    private int status;
+    private int status = PackageStatus.onLine;
 
     /**
      * 是否是patch包
@@ -84,7 +84,7 @@ public class PackageInfo {
     @Override
     public int hashCode() {
         int result = 17;
-        result = result * 37 + packageId == null ? 0 :  packageId.hashCode();
+        result = result * 37 + packageId == null ? 0 : packageId.hashCode();
         return result;
     }
 }

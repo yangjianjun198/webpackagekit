@@ -36,6 +36,8 @@ public class ResourceInfo {
      */
     private String mimeType;
 
+    private String md5;
+
     public void setPackageId(String packageId) {
         this.packageId = packageId;
     }
@@ -75,5 +77,9 @@ public class ResourceInfo {
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    public String getMd5() {
+        return md5;
     }
 }
