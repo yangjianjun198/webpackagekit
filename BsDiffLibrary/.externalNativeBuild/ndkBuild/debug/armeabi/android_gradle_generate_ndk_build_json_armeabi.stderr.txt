@@ -1,1 +1,0 @@
-/Users/yangjianjun/Library/Android/sdk/ndk-bundle/build/core/init.mk:494: *** Android NDK: Aborting...    .  Stop.

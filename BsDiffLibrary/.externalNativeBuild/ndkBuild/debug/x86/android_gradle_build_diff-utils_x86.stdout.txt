@@ -1,2 +1,0 @@
-[x86] Compile        : diff-utils <= com_yjj_utils_DiffUtils.c
-[x86] SharedLibrary  : libdiff-utils.so

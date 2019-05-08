@@ -76,5 +76,5 @@ build.xml-bak*
 custom_rules.xml
 Makefile
 UIRouterTable/
-
+*.externalNativeBuild
 /*/schemas/
