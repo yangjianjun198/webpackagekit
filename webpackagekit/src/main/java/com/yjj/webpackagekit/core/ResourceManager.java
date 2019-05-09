@@ -10,4 +10,8 @@ public interface ResourceManager {
     WebResourceResponse getResource(String url);
 
     boolean updateResource(String packageId);
+
+    void setResourceValidator(ResoureceValidator validator);
+
+    String getPackageId(String url);
 }

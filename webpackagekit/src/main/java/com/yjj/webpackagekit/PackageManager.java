@@ -8,13 +8,13 @@ import android.os.Message;
 import android.webkit.WebResourceResponse;
 
 import com.google.gson.Gson;
-import com.liulishuo.filedownloader.FileDownloader;
 import com.yjj.webpackagekit.core.Downloader;
 import com.yjj.webpackagekit.core.PackageEntity;
 import com.yjj.webpackagekit.core.PackageInfo;
 import com.yjj.webpackagekit.core.PackageInstaller;
 import com.yjj.webpackagekit.core.PackageStatus;
 import com.yjj.webpackagekit.core.ResourceManager;
+import com.yjj.webpackagekit.core.ResoureceValidator;
 import com.yjj.webpackagekit.core.util.FileUtils;
 import com.yjj.webpackagekit.core.util.GsonUtils;
 import com.yjj.webpackagekit.core.util.Logger;
@@ -30,7 +30,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * created by yangjianjun on 2018/10/24
@@ -41,11 +45,13 @@ public class PackageManager {
     private static final int WHAT_DOWNLOAD_FAILURE = 2;
     private static final int WHAT_START_UPDATE = 3;
 
+    private static final int STATUS_PACKAGE_CANUSE = 1;
+    private volatile static PackageManager instance;
+
     private Context context;
     private ResourceManager resourceManager;
     private PackageInstaller packageInstaller;
-    private volatile static PackageManager instance;
-    private volatile boolean isInstalled = false;
+    private volatile boolean isUpdating = false;
     private Handler packageHandler;
     private HandlerThread packageThread;
     private PackageEntity localPackageEntity;
@@ -57,6 +63,9 @@ public class PackageManager {
      * 需要更新资源
      * */
     private List<PackageInfo> onlyUpdatePackageInfoList;
+    private Lock resouceLock;
+    private PackageValidator validator;
+    private Map<String, Integer> packageStatusMap = new HashMap<>();
 
     public static PackageManager getInstance() {
         if (instance == null) {
@@ -73,7 +82,19 @@ public class PackageManager {
         this.context = context;
         resourceManager = new ResourceManagerImpl(context);
         packageInstaller = new PackageInstallerImpl(context);
-        FileDownloader.init(context);
+        validator = new DefaultPackageValidator(context);
+    }
+
+    public void setResouceValidator(ResoureceValidator validator) {
+        resourceManager.setResourceValidator(validator);
+    }
+
+    public void setPackageValidator(PackageValidator validator) {
+        this.validator = validator;
+    }
+
+    private PackageManager() {
+        resouceLock = new ReentrantLock();
     }
 
     /**
@@ -82,7 +103,7 @@ public class PackageManager {
      * @param packageStr package json字符串
      */
     public void update(String packageStr) {
-        if (isInstalled) {
+        if (isUpdating) {
             return;
         }
         if (packageStr == null) {
@@ -140,12 +161,13 @@ public class PackageManager {
             Downloader downloader = new DownloaderImpl(context);
             downloader.download(packageInfo, new DownloadCallback(this));
         }
-        if (willDownloadPackageInfoList.size() == 0 && onlyUpdatePackageInfoList != null
-            && onlyUpdatePackageInfoList.size() > 0) {
+        if (onlyUpdatePackageInfoList != null && onlyUpdatePackageInfoList.size() > 0) {
             for (PackageInfo packageInfo : onlyUpdatePackageInfoList) {
                 resourceManager.updateResource(packageInfo.getPackageId());
                 updateIndexFile(packageInfo.getPackageId(), packageInfo.getVersion());
-                isInstalled = true;
+                synchronized (packageStatusMap) {
+                    packageStatusMap.put(packageInfo.getPackageId(), STATUS_PACKAGE_CANUSE);
+                }
             }
         }
     }
@@ -263,11 +285,20 @@ public class PackageManager {
     }
 
     public WebResourceResponse getResource(String url) {
-        if (!isInstalled) {
-            Logger.w("get resource is error for package not install");
+        synchronized (packageStatusMap) {
+            String packageId = resourceManager.getPackageId(url);
+            int status = packageStatusMap.get(packageId);
+            if (status != STATUS_PACKAGE_CANUSE) {
+                return null;
+            }
+        }
+        WebResourceResponse resourceResponse = null;
+        if (!resouceLock.tryLock()) {
             return null;
         }
-        return resourceManager.getResource(url);
+        resourceResponse = resourceManager.getResource(url);
+        resouceLock.unlock();
+        return resourceResponse;
     }
 
     private void downloadSuccess(String packageId) {
@@ -295,40 +326,32 @@ public class PackageManager {
             return;
         }
         PackageInfo packageInfo = null;
-        boolean isDownloadAll;
         PackageInfo tmp = new PackageInfo();
         tmp.setPackageId(packageId);
         int pos = willDownloadPackageInfoList.indexOf(tmp);
         if (pos >= 0) {
             packageInfo = willDownloadPackageInfoList.remove(pos);
         }
-        isDownloadAll = willDownloadPackageInfoList.size() == 0;
+        allResouceUpdateFinished();
         /**
          * 安装
          * */
         if (packageInfo != null) {
-            String downloadFilePath = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
-            File downloadFile = new File(downloadFilePath);
-            if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
+            if (validator.validate(packageInfo)) {
+                resouceLock.lock();
                 boolean isSuccess = packageInstaller.install(packageInfo);
+                resouceLock.unlock();
+                /**
+                 * 安装失败情况下，不做任何处理，因为资源既然资源需要最新资源，失败了，就没有必要再用缓存了
+                 */
                 if (isSuccess) {
                     resourceManager.updateResource(packageInfo.getPackageId());
                     updateIndexFile(packageInfo.getPackageId(), packageInfo.getVersion());
+                    synchronized (packageStatusMap) {
+                        packageStatusMap.put(packageId, STATUS_PACKAGE_CANUSE);
+                    }
                 }
             }
-        }
-
-        /***
-         * 全部下载完毕,开始更新原有的资源信息
-         * */
-        if (isDownloadAll && onlyUpdatePackageInfoList != null) {
-            for (PackageInfo packageInfo1 : onlyUpdatePackageInfoList) {
-                resourceManager.updateResource(packageInfo1.getPackageId());
-                updateIndexFile(packageInfo1.getPackageId(), packageInfo1.getVersion());
-            }
-        }
-        if (isDownloadAll) {
-            isInstalled = true;
         }
     }
 
@@ -342,20 +365,16 @@ public class PackageManager {
         if (willDownloadPackageInfoList == null) {
             return;
         }
-        boolean isDownloadAll;
         int pos = willDownloadPackageInfoList.indexOf(packageId);
         if (pos >= 0) {
             willDownloadPackageInfoList.remove(pos);
         }
-        isDownloadAll = willDownloadPackageInfoList.size() == 0;
-        if (isDownloadAll && onlyUpdatePackageInfoList != null) {
-            for (PackageInfo packageInfo1 : onlyUpdatePackageInfoList) {
-                resourceManager.updateResource(packageInfo1.getPackageId());
-                updateIndexFile(packageInfo1.getPackageId(), packageInfo1.getVersion());
-            }
-        }
-        if (isDownloadAll) {
-            isInstalled = true;
+        allResouceUpdateFinished();
+    }
+
+    private void allResouceUpdateFinished() {
+        if (willDownloadPackageInfoList.size() == 0) {
+            isUpdating = false;
         }
     }
 
@@ -384,7 +403,7 @@ public class PackageManager {
         }
     }
 
-    private static class DownloadCallback implements Downloader.DownloadCallback {
+    static class DownloadCallback implements Downloader.DownloadCallback {
         private PackageManager packageManager;
 
         public DownloadCallback(PackageManager packageManager) {
@@ -399,6 +418,24 @@ public class PackageManager {
         @Override
         public void onFailure(String packageId) {
             packageManager.downloadFailure(packageId);
+        }
+    }
+
+    static class DefaultPackageValidator implements PackageValidator {
+        private Context context;
+
+        public DefaultPackageValidator(Context context) {
+            this.context = context;
+        }
+
+        @Override
+        public boolean validate(PackageInfo packageInfo) {
+            String downloadFilePath = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
+            File downloadFile = new File(downloadFilePath);
+            if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
+                return true;
+            }
+            return false;
         }
     }
 }

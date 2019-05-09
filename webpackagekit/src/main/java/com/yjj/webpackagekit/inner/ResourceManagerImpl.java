@@ -10,6 +10,7 @@ import com.yjj.webpackagekit.core.ResourceInfo;
 import com.yjj.webpackagekit.core.ResourceInfoEntity;
 import com.yjj.webpackagekit.core.ResourceKey;
 import com.yjj.webpackagekit.core.ResourceManager;
+import com.yjj.webpackagekit.core.ResoureceValidator;
 import com.yjj.webpackagekit.core.util.FileUtils;
 import com.yjj.webpackagekit.core.util.GsonUtils;
 import com.yjj.webpackagekit.core.util.Logger;
@@ -36,18 +37,20 @@ public class ResourceManagerImpl implements ResourceManager {
     private Map<ResourceKey, ResourceInfo> resourceInfoMap;
     private Context context;
     private Lock lock;
+    private ResoureceValidator validator;
 
     public ResourceManagerImpl(Context context) {
         resourceInfoMap = new ConcurrentHashMap<>(16);
         this.context = context;
         lock = new ReentrantLock();
+        validator = new DefaultResourceValidator();
     }
 
     /**
      * 获取资源信息
      * 会做md5校验
+     *
      * @param url 请求地址
-     * @return
      */
     @Override
     public WebResourceResponse getResource(String url) {
@@ -62,33 +65,18 @@ public class ResourceManagerImpl implements ResourceManager {
         }
         if (!MimeTypeUtils.checkIsSupportMimeType(resourceInfo.getMimeType())) {
             Logger.d("getResource [" + url + "]" + " is not support mime type");
+            safeRemoveResource(key);
             return null;
         }
         InputStream inputStream = FileUtils.getInputStream(resourceInfo.getLocalPath());
         if (inputStream == null) {
             Logger.d("getResource [" + url + "]" + " inputStream is null");
-            return null;
-        }
-        String rMd5 = resourceInfo.getMd5();
-        if (!TextUtils.isEmpty(rMd5) && !MD5Utils.checkMD5(rMd5, new File(resourceInfo.getLocalPath()))) {
             safeRemoveResource(key);
             return null;
         }
-        /**
-         * 没有配置md5做简单的校验
-         */
-        if (TextUtils.isEmpty(rMd5)) {
-            int size = 0;
-            try {
-                size = inputStream.available();
-            } catch (IOException e) {
-
-            }
-            if (size == 0) {
-                Logger.e("resource file is error ");
-                safeRemoveResource(key);
-                return null;
-            }
+        if (validator != null && !validator.validate(resourceInfo)) {
+            safeRemoveResource(key);
+            return null;
         }
         WebResourceResponse response;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -166,5 +154,45 @@ public class ResourceManagerImpl implements ResourceManager {
             lock.unlock();
         }
         return isSuccess;
+    }
+
+    @Override
+    public void setResourceValidator(ResoureceValidator validator) {
+        this.validator = validator;
+    }
+
+    @Override
+    public String getPackageId(String url) {
+        if (!lock.tryLock()) {
+            return null;
+        }
+        ResourceInfo resourceInfo = resourceInfoMap.get(new ResourceKey(url));
+        lock.unlock();
+        if (resourceInfo != null) {
+            return resourceInfo.getPackageId();
+        }
+        return null;
+    }
+
+    static class DefaultResourceValidator implements ResoureceValidator {
+        @Override
+        public boolean validate(ResourceInfo resourceInfo) {
+            String rMd5 = resourceInfo.getMd5();
+            if (!TextUtils.isEmpty(rMd5) && !MD5Utils.checkMD5(rMd5, new File(resourceInfo.getLocalPath()))) {
+                return false;
+            }
+            int size = 0;
+            try {
+                InputStream inputStream = FileUtils.getInputStream(resourceInfo.getLocalPath());
+                size = inputStream.available();
+            } catch (IOException e) {
+                Logger.e("resource file is error " + e.getMessage());
+            }
+            if (size == 0) {
+                Logger.e("resource file is error ");
+                return false;
+            }
+            return true;
+        }
     }
 }
