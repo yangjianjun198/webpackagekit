@@ -63,7 +63,7 @@ public class PackageManager {
      * 需要更新资源
      * */
     private List<PackageInfo> onlyUpdatePackageInfoList;
-    private Lock resouceLock;
+    private Lock resourceLock;
     private PackageValidator validator;
     private Map<String, Integer> packageStatusMap = new HashMap<>();
 
@@ -94,7 +94,7 @@ public class PackageManager {
     }
 
     private PackageManager() {
-        resouceLock = new ReentrantLock();
+        resourceLock = new ReentrantLock();
     }
 
     /**
@@ -293,11 +293,11 @@ public class PackageManager {
             }
         }
         WebResourceResponse resourceResponse = null;
-        if (!resouceLock.tryLock()) {
+        if (!resourceLock.tryLock()) {
             return null;
         }
         resourceResponse = resourceManager.getResource(url);
-        resouceLock.unlock();
+        resourceLock.unlock();
         return resourceResponse;
     }
 
@@ -338,9 +338,9 @@ public class PackageManager {
          * */
         if (packageInfo != null) {
             if (validator.validate(packageInfo)) {
-                resouceLock.lock();
+                resourceLock.lock();
                 boolean isSuccess = packageInstaller.install(packageInfo);
-                resouceLock.unlock();
+                resourceLock.unlock();
                 /**
                  * 安装失败情况下，不做任何处理，因为资源既然资源需要最新资源，失败了，就没有必要再用缓存了
                  */
