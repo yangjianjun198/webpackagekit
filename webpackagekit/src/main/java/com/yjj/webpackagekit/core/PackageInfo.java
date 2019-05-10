@@ -72,6 +72,10 @@ public class PackageInfo {
         this.status = status;
     }
 
+    public void setMd5(String md5) {
+        this.md5 = md5;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof PackageInfo)) {

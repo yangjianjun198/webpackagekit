@@ -5,9 +5,11 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
+import android.text.TextUtils;
 import android.webkit.WebResourceResponse;
 
 import com.google.gson.Gson;
+import com.yjj.webpackagekit.core.AssetResourceLoader;
 import com.yjj.webpackagekit.core.Downloader;
 import com.yjj.webpackagekit.core.PackageEntity;
 import com.yjj.webpackagekit.core.PackageInfo;
@@ -20,6 +22,7 @@ import com.yjj.webpackagekit.core.util.GsonUtils;
 import com.yjj.webpackagekit.core.util.Logger;
 import com.yjj.webpackagekit.core.util.MD5Utils;
 import com.yjj.webpackagekit.core.util.VersionUtils;
+import com.yjj.webpackagekit.inner.AssetResourceLoaderImpl;
 import com.yjj.webpackagekit.inner.DownloaderImpl;
 import com.yjj.webpackagekit.inner.PackageInstallerImpl;
 import com.yjj.webpackagekit.inner.ResourceManagerImpl;
@@ -44,6 +47,7 @@ public class PackageManager {
     private static final int WHAT_DOWNLOAD_SUCCESS = 1;
     private static final int WHAT_DOWNLOAD_FAILURE = 2;
     private static final int WHAT_START_UPDATE = 3;
+    private static final int WHAT_INIT_ASSETS = 4;
 
     private static final int STATUS_PACKAGE_CANUSE = 1;
     private volatile static PackageManager instance;
@@ -51,6 +55,7 @@ public class PackageManager {
     private Context context;
     private ResourceManager resourceManager;
     private PackageInstaller packageInstaller;
+    private AssetResourceLoader assetResourceLoader;
     private volatile boolean isUpdating = false;
     private Handler packageHandler;
     private HandlerThread packageThread;
@@ -65,7 +70,9 @@ public class PackageManager {
     private List<PackageInfo> onlyUpdatePackageInfoList;
     private Lock resourceLock;
     private PackageValidator validator;
+    private PackageValidator assetValidator;
     private Map<String, Integer> packageStatusMap = new HashMap<>();
+    private PackageConfig config = new PackageConfig();
 
     public static PackageManager getInstance() {
         if (instance == null) {
@@ -83,6 +90,12 @@ public class PackageManager {
         resourceManager = new ResourceManagerImpl(context);
         packageInstaller = new PackageInstallerImpl(context);
         validator = new DefaultPackageValidator(context);
+        if (config.isEnableAssets() && !TextUtils.isEmpty(config.getAssetPath())) {
+            assetResourceLoader = new AssetResourceLoaderImpl(context);
+            assetValidator = new DefaultAssetPackageValidator(context);
+            ensurePacakageThread();
+            packageHandler.sendEmptyMessage(WHAT_INIT_ASSETS);
+        }
     }
 
     public void setResouceValidator(ResoureceValidator validator) {
@@ -109,15 +122,19 @@ public class PackageManager {
         if (packageStr == null) {
             packageStr = "";
         }
+        ensurePacakageThread();
+        Message message = Message.obtain();
+        message.what = WHAT_START_UPDATE;
+        message.obj = packageStr;
+        packageHandler.sendMessage(message);
+    }
+
+    private void ensurePacakageThread() {
         if (packageThread == null) {
             packageThread = new HandlerThread("offline_package_thread");
             packageThread.start();
             packageHandler = new DownloadHandler(packageThread.getLooper());
         }
-        Message message = Message.obtain();
-        message.what = WHAT_START_UPDATE;
-        message.obj = packageStr;
-        packageHandler.sendMessage(message);
     }
 
     /**
@@ -288,7 +305,7 @@ public class PackageManager {
         synchronized (packageStatusMap) {
             String packageId = resourceManager.getPackageId(url);
             Integer status = packageStatusMap.get(packageId);
-            if(status == null) {
+            if (status == null) {
                 return null;
             }
             if (status != STATUS_PACKAGE_CANUSE) {
@@ -336,13 +353,18 @@ public class PackageManager {
             packageInfo = willDownloadPackageInfoList.remove(pos);
         }
         allResouceUpdateFinished();
+        installPackage(packageId, packageInfo, false);
+    }
+
+    private void installPackage(String packageId, PackageInfo packageInfo, boolean isAssets) {
         /**
          * 安装
          * */
         if (packageInfo != null) {
-            if (validator.validate(packageInfo)) {
+            boolean isValid = (isAssets && assetValidator.validate(packageInfo)) || validator.validate(packageInfo);
+            if (isValid) {
                 resourceLock.lock();
-                boolean isSuccess = packageInstaller.install(packageInfo);
+                boolean isSuccess = packageInstaller.install(packageInfo, isAssets);
                 resourceLock.unlock();
                 /**
                  * 安装失败情况下，不做任何处理，因为资源既然资源需要最新资源，失败了，就没有必要再用缓存了
@@ -400,10 +422,25 @@ public class PackageManager {
                     break;
                 case WHAT_START_UPDATE:
                     performUpdate((String) msg.obj);
+                    break;
+                case WHAT_INIT_ASSETS:
+                    performLoadAssets();
+                    break;
                 default:
                     break;
             }
         }
+    }
+
+    private void performLoadAssets() {
+        if (assetResourceLoader == null) {
+            return;
+        }
+        PackageInfo packageInfo = assetResourceLoader.load(config.getAssetPath());
+        if (packageInfo == null) {
+            return;
+        }
+        installPackage(packageInfo.getPackageId(), packageInfo, true);
     }
 
     static class DownloadCallback implements Downloader.DownloadCallback {
@@ -434,6 +471,24 @@ public class PackageManager {
         @Override
         public boolean validate(PackageInfo packageInfo) {
             String downloadFilePath = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
+            File downloadFile = new File(downloadFilePath);
+            if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
+                return true;
+            }
+            return false;
+        }
+    }
+
+    static class DefaultAssetPackageValidator implements PackageValidator {
+        private Context context;
+
+        DefaultAssetPackageValidator(Context context) {
+            this.context = context;
+        }
+
+        @Override
+        public boolean validate(PackageInfo packageInfo) {
+            String downloadFilePath = FileUtils.getPackageAssetsName(context);
             File downloadFile = new File(downloadFilePath);
             if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
                 return true;

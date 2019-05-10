@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import com.yjj.webpackagekit.core.Contants;
 
 import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -101,11 +102,7 @@ public class FileUtils {
             }
             zipEntry = readZipNextZipEntry(inZip);
         }
-        try {
-            inZip.close();
-        } catch (IOException e) {
-            isSuccess = false;
-        }
+        isSuccess = safeCloseFile(inZip);
         return isSuccess;
     }
 
@@ -186,7 +183,7 @@ public class FileUtils {
         int len = -1;
         byte[] buffer = new byte[1024];
         len = readZipFile(inZip, buffer);
-        if (len == -1) {
+        if (len == -1 || len == -2) {
             isSuccess = false;
         }
         if (!isSuccess) {
@@ -351,23 +348,23 @@ public class FileUtils {
     /***
      * 根据packageId获取下载目录文件
      * */
+    public static String getPackageAssetsName(Context context) {
+        String root = getPackageRootPath(context);
+        if (TextUtils.isEmpty(root)) {
+            return null;
+        }
+        return root + File.separator + "assets" + File.separator + Contants.PACKAGE_DOWNLOAD;
+    }
+
+    /***
+     * 根据packageId获取下载目录文件
+     * */
     public static String getPackageMergePatch(Context context, String packageId) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
         return root + File.separator + packageId + File.separator + Contants.PACKAGE_MERGE;
-    }
-
-    /***
-     * 根据packageId获取update_tmp地址
-     * */
-    public static String getPackageUpdareTempName(Context context, String packageId) {
-        String root = getPackageRootPath(context);
-        if (TextUtils.isEmpty(root)) {
-            return null;
-        }
-        return root + File.separator + packageId + File.separator + Contants.PACKAGE_UPDATE_TEMP;
     }
 
     /**
@@ -544,5 +541,108 @@ public class FileUtils {
             }
         }
         return dir.delete();
+    }
+
+    public static String getStringForZip(InputStream zipFileString) {
+        boolean isSuccess = true;
+        ZipInputStream inZip = null;
+        try {
+            inZip = new ZipInputStream(zipFileString);
+        } catch (Exception e) {
+            isSuccess = false;
+        }
+        if (!isSuccess) {
+            return null;
+        }
+        ZipEntry zipEntry = null;
+        zipEntry = readZipNextZipEntry(inZip);
+        if (zipEntry == null) {
+            safeCloseFile(inZip);
+            return "";
+        }
+        String szName;
+        while (zipEntry != null) {
+            szName = zipEntry.getName();
+            /**
+             * 是index.json
+             */
+            if (szName.equals(Contants.RESOURCE_MIDDLE_PATH + File.separator + Contants.RESOURCE_INDEX_NAME)) {
+                break;
+            }
+            if (!isSuccess) {
+                break;
+            }
+            zipEntry = readZipNextZipEntry(inZip);
+        }
+        if (zipEntry == null) {
+            safeCloseFile(inZip);
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        int len = -1;
+        byte[] buffer = new byte[2048];
+        len = readZipFile(inZip, buffer);
+        while (len != -1) {
+            if (len == -2) {
+                isSuccess = false;
+                break;
+            }
+            sb.append(new String(buffer, 0, len));
+            len = readZipFile(inZip, buffer);
+        }
+        isSuccess = safeCloseFile(inZip);
+        if (isSuccess) {
+            return sb.toString();
+        }
+        return "";
+    }
+
+    public static boolean safeCloseFile(Closeable file) {
+        boolean isSuccess = true;
+        try {
+            file.close();
+        } catch (IOException e) {
+            isSuccess = false;
+        }
+        return isSuccess;
+    }
+
+    public static boolean copyFile(InputStream inStream, String newPath) {
+        boolean isSuccess = true;
+        try {
+            int byteread = 0;
+            File file = new File(newPath);
+            if (file.exists()) {
+                isSuccess = file.delete();
+            }
+            if (!isSuccess) {
+                return false;
+            }
+            if (file.getParentFile() != null && !file.getParentFile().exists()) {
+                isSuccess = file.getParentFile().mkdirs();
+            }
+            if (!isSuccess) {
+                return false;
+            }
+            isSuccess = file.createNewFile();
+            if (!isSuccess) {
+                return false;
+            }
+            FileOutputStream fs = new FileOutputStream(file);
+            byte[] buffer = new byte[1024 * 16];
+            while ((byteread = inStream.read(buffer)) != -1) {
+                fs.write(buffer, 0, byteread);
+            }
+            try {
+                fs.flush();
+            } catch (Exception e) {
+
+            }
+            safeCloseFile(inStream);
+            safeCloseFile(fs);
+        } catch (Exception e) {
+            isSuccess = false;
+        }
+        return isSuccess;
     }
 }

@@ -12,6 +12,7 @@ public class ResourceInfo {
      * 所关联的package id
      * 后续需要根据该id索引离线包信息
      */
+    @Expose(deserialize = false, serialize = false)
     private String packageId;
 
     /***

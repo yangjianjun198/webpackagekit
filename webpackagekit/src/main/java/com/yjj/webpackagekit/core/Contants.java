@@ -51,4 +51,9 @@ public class Contants {
      * 中间路径
      */
     public static final String RESOURCE_MIDDLE_PATH = "package";
+
+    /**
+     * asstes文件名称
+     */
+    public static final String PACKAGE_ASSETS= "package_assets.zip";
 }

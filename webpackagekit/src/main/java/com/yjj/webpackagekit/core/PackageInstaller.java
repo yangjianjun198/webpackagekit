@@ -8,5 +8,5 @@ package com.yjj.webpackagekit.core;
  * 3、提取index.json中的内容到ResourceManager中
  */
 public interface PackageInstaller {
-     boolean install(PackageInfo packageInfo);
+    boolean install(PackageInfo packageInfo, boolean isAssets);
 }

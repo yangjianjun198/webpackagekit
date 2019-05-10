@@ -145,6 +145,7 @@ public class ResourceManagerImpl implements ResourceManager {
             if (TextUtils.isEmpty(resourceInfo.getPath())) {
                 continue;
             }
+            resourceInfo.setPackageId(packageId);
             String path = resourceInfo.getPath();
             path = path.startsWith(File.separator) ? path.substring(1) : path;
             resourceInfo.setLocalPath(

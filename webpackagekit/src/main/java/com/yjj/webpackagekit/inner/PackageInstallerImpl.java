@@ -25,16 +25,14 @@ public class PackageInstallerImpl implements PackageInstaller {
      * 下载文件 download.zip
      * 如果是patch文件 merge.zip
      * 更新后的zip目录 update.zip
-     *
-     * @param packageInfo
-     * @return
      */
     @Override
-    public boolean install(PackageInfo packageInfo) {
+    public boolean install(PackageInfo packageInfo, boolean isAssets) {
         /**
          * 获取下载目录
          * */
-        String downloadFile = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
+        String downloadFile = isAssets ? FileUtils.getPackageAssetsName(context)
+            : FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
         String willCopyFile = downloadFile;
         /**
          * 获取update.zip名称
