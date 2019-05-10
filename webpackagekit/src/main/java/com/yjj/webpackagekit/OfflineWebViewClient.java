@@ -2,7 +2,12 @@ package com.yjj.webpackagekit;
 
 import android.annotation.TargetApi;
 import android.graphics.Bitmap;
+import android.net.http.SslError;
 import android.os.Build;
+import android.os.Message;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.SslErrorHandler;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
@@ -11,6 +16,7 @@ import android.webkit.WebViewClient;
 import com.yjj.webpackagekit.core.util.Logger;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 /**
  * created by yangjianjun on 2018/9/26
@@ -96,5 +102,43 @@ public class OfflineWebViewClient extends WebViewClient {
         }
         super.onReceivedError(view, errorCode, description, failingUrl);
     }
+
+    @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+        if (delegate != null) {
+            delegate.onReceivedSslError(view, handler, error);
+            return;
+        }
+        super.onReceivedSslError(view, handler, error);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.M)
+    @Override
+    public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+        if (delegate != null) {
+            delegate.onReceivedError(view, request, error);
+            return;
+        }
+        super.onReceivedError(view, request, error);
+    }
+
+    @Override
+    public void onLoadResource(WebView view, String url) {
+        if (delegate != null) {
+            delegate.onLoadResource(view, url);
+            return;
+        }
+        super.onLoadResource(view, url);
+    }
+
+    @Override
+    public void onReceivedLoginRequest(WebView view, String realm, @Nullable String account, String args) {
+        if (delegate != null) {
+            delegate.onReceivedLoginRequest(view, realm, account, args);
+            return;
+        }
+        super.onReceivedLoginRequest(view, realm, account, args);
+    }
+
 }
 
