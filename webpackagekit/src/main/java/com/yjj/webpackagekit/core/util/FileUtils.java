@@ -353,7 +353,7 @@ public class FileUtils {
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + "assets" + File.separator + Contants.PACKAGE_DOWNLOAD;
+        return root + File.separator + "assets" + File.separator + Contants.PACKAGE_ASSETS;
     }
 
     /***
