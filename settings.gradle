@@ -1,1 +1,1 @@
-include ':app', ':webpackagekit',":BsDiffLibrary"
+include ':app', ':webpackagekit'

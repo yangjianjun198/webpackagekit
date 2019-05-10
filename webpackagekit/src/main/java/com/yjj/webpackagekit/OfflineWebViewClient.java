@@ -1,15 +1,16 @@
 package com.yjj.webpackagekit;
 
+import android.annotation.TargetApi;
 import android.graphics.Bitmap;
 import android.os.Build;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import com.yjj.webpackagekit.core.util.Logger;
 
-import java.util.HashMap;
-import java.util.Map;
+import androidx.annotation.Nullable;
 
 /**
  * created by yangjianjun on 2018/9/26
@@ -34,6 +35,21 @@ public class OfflineWebViewClient extends WebViewClient {
         }
         Logger.d("shouldInterceptRequest after cache " + url);
         return resourceResponse;
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @Nullable
+    @Override
+    public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+        final String url = request.getUrl().toString();
+        WebResourceResponse resourceResponse = getWebResourceResponse(url);
+        if (resourceResponse == null) {
+            if (delegate != null) {
+                return delegate.shouldInterceptRequest(view, url);
+            }
+            return super.shouldInterceptRequest(view, url);
+        }
+        return super.shouldInterceptRequest(view, request);
     }
 
     @Override

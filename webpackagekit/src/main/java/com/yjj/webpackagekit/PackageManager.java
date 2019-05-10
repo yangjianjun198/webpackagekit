@@ -287,7 +287,10 @@ public class PackageManager {
     public WebResourceResponse getResource(String url) {
         synchronized (packageStatusMap) {
             String packageId = resourceManager.getPackageId(url);
-            int status = packageStatusMap.get(packageId);
+            Integer status = packageStatusMap.get(packageId);
+            if(status == null) {
+                return null;
+            }
             if (status != STATUS_PACKAGE_CANUSE) {
                 return null;
             }
