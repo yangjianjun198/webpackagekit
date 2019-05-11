@@ -9,7 +9,7 @@ import android.webkit.WebResourceResponse;
 public interface ResourceManager {
     WebResourceResponse getResource(String url);
 
-    boolean updateResource(String packageId);
+    boolean updateResource(String packageId, String version);
 
     void setResourceValidator(ResoureceValidator validator);
 

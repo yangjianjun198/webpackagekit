@@ -31,7 +31,6 @@ public class AssetResourceLoaderImpl implements AssetResourceLoader {
 
     @Override
     public PackageInfo load(String path) {
-        String assetPath = FileUtils.getPackageAssetsName(context);
         InputStream inputStream = null;
 
         inputStream = openAssetInputStream(path);
@@ -47,7 +46,8 @@ public class AssetResourceLoaderImpl implements AssetResourceLoader {
         if (inputStream == null) {
             return null;
         }
-        File file = new File(FileUtils.getPackageUpdateName(context, assetEntity.getPackageId()));
+        File file =
+            new File(FileUtils.getPackageUpdateName(context, assetEntity.getPackageId(), assetEntity.getVersion()));
         ResourceInfoEntity localEntity = null;
         FileInputStream fileInputStream = null;
         if (file.exists()) {
@@ -68,6 +68,8 @@ public class AssetResourceLoaderImpl implements AssetResourceLoader {
             && VersionUtils.compareVersion(assetEntity.getVersion(), localEntity.getVersion()) <= 0) {
             return null;
         }
+        String assetPath =
+            FileUtils.getPackageAssetsName(context, assetEntity.getPackageId(), assetEntity.getVersion());
         boolean isSuccess = FileUtils.copyFile(inputStream, assetPath);
         if (!isSuccess) {
             return null;

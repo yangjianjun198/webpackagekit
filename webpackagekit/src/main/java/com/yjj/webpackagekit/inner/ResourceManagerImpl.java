@@ -98,10 +98,10 @@ public class ResourceManagerImpl implements ResourceManager {
     }
 
     @Override
-    public boolean updateResource(String packageId) {
+    public boolean updateResource(String packageId, String version) {
         boolean isSuccess = false;
         String indexFileName =
-            FileUtils.getPackageWorkName(context, packageId) + File.separator + Contants.RESOURCE_MIDDLE_PATH
+            FileUtils.getPackageWorkName(context, packageId, version) + File.separator + Contants.RESOURCE_MIDDLE_PATH
                 + File.separator + Contants.RESOURCE_INDEX_NAME;
         Logger.d("updateResource indexFileName: " + indexFileName);
         File indexFile = new File(indexFileName);
@@ -140,7 +140,7 @@ public class ResourceManagerImpl implements ResourceManager {
         if (resourceInfos == null) {
             return isSuccess;
         }
-        String workPath = FileUtils.getPackageWorkName(context, packageId);
+        String workPath = FileUtils.getPackageWorkName(context, packageId, version);
         for (ResourceInfo resourceInfo : resourceInfos) {
             if (TextUtils.isEmpty(resourceInfo.getPath())) {
                 continue;

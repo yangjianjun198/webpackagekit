@@ -27,7 +27,7 @@ public class DownloaderImpl implements Downloader {
         BaseDownloadTask downloadTask = FileDownloader.getImpl()
             .create(packageInfo.getDownloadUrl())
             .setTag(packageInfo.getPackageId())
-            .setPath(FileUtils.getPackageDownloadName(context, packageInfo.getPackageId()))
+            .setPath(FileUtils.getPackageDownloadName(context, packageInfo.getPackageId(), packageInfo.getVersion()))
             .setListener(new FileDownloadSampleListener() {
                 @Override
                 protected void completed(BaseDownloadTask task) {

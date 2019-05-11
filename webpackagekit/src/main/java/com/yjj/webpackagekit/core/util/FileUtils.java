@@ -240,10 +240,10 @@ public class FileUtils {
         return appCacheDir;
     }
 
-    public static File getResourceIndexFile(Context context, String packageId) {
+    public static File getResourceIndexFile(Context context, String packageId, String version) {
         String indexPath =
-            getPackageWorkName(context, packageId) + File.separator + Contants.RESOURCE_MIDDLE_PATH + File.separator
-                + Contants.RESOURCE_INDEX_NAME;
+            getPackageWorkName(context, packageId, version) + File.separator + Contants.RESOURCE_MIDDLE_PATH
+                + File.separator + Contants.RESOURCE_INDEX_NAME;
         return new File(indexPath);
     }
 
@@ -303,12 +303,23 @@ public class FileUtils {
     /***
      * 根据packageId获取work地址
      * */
-    public static String getPackageWorkName(Context context, String packageId) {
+    public static String getPackageWorkName(Context context, String packageId, String version) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + packageId + File.separator + Contants.PACKAGE_WORK;
+        return root + File.separator + packageId + File.separator + version + File.separator + Contants.PACKAGE_WORK;
+    }
+
+    /***
+     * 根据packageId获取work地址
+     * */
+    public static String getPackageRootByPackageId(Context context, String packageId) {
+        String root = getPackageRootPath(context);
+        if (TextUtils.isEmpty(root)) {
+            return null;
+        }
+        return root + File.separator + packageId;
     }
 
     /***
@@ -326,45 +337,47 @@ public class FileUtils {
     /***
      * 根据packageId获取update地址
      * */
-    public static String getPackageUpdateName(Context context, String packageId) {
+    public static String getPackageUpdateName(Context context, String packageId, String version) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + packageId + File.separator + Contants.PACKAGE_UPDATE;
+        return root + File.separator + packageId + File.separator + version + File.separator + Contants.PACKAGE_UPDATE;
     }
 
     /***
      * 根据packageId获取下载目录文件
      * */
-    public static String getPackageDownloadName(Context context, String packageId) {
+    public static String getPackageDownloadName(Context context, String packageId, String versions) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + packageId + File.separator + Contants.PACKAGE_DOWNLOAD;
+        return root + File.separator + packageId + File.separator + versions + File.separator
+            + Contants.PACKAGE_DOWNLOAD;
     }
 
     /***
      * 根据packageId获取下载目录文件
      * */
-    public static String getPackageAssetsName(Context context) {
+    public static String getPackageAssetsName(Context context, String packageId, String version) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + "assets" + File.separator + Contants.PACKAGE_ASSETS;
+        return root + File.separator + "assets" + File.separator + packageId + File.separator + version + File.separator
+            + Contants.PACKAGE_ASSETS;
     }
 
     /***
      * 根据packageId获取下载目录文件
      * */
-    public static String getPackageMergePatch(Context context, String packageId) {
+    public static String getPackageMergePatch(Context context, String packageId, String version) {
         String root = getPackageRootPath(context);
         if (TextUtils.isEmpty(root)) {
             return null;
         }
-        return root + File.separator + packageId + File.separator + Contants.PACKAGE_MERGE;
+        return root + File.separator + packageId + File.separator + version + File.separator + Contants.PACKAGE_MERGE;
     }
 
     /**

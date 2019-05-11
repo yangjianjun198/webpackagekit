@@ -9,6 +9,7 @@ import android.text.TextUtils;
 import android.webkit.WebResourceResponse;
 
 import com.google.gson.Gson;
+import com.liulishuo.filedownloader.FileDownloader;
 import com.yjj.webpackagekit.core.AssetResourceLoader;
 import com.yjj.webpackagekit.core.Downloader;
 import com.yjj.webpackagekit.core.PackageEntity;
@@ -89,6 +90,7 @@ public class PackageManager {
         this.context = context;
         resourceManager = new ResourceManagerImpl(context);
         packageInstaller = new PackageInstallerImpl(context);
+        FileDownloader.init(context);
         validator = new DefaultPackageValidator(context);
         if (config.isEnableAssets() && !TextUtils.isEmpty(config.getAssetPath())) {
             assetResourceLoader = new AssetResourceLoaderImpl(context);
@@ -180,7 +182,7 @@ public class PackageManager {
         }
         if (onlyUpdatePackageInfoList != null && onlyUpdatePackageInfoList.size() > 0) {
             for (PackageInfo packageInfo : onlyUpdatePackageInfoList) {
-                resourceManager.updateResource(packageInfo.getPackageId());
+                resourceManager.updateResource(packageInfo.getPackageId(), packageInfo.getVersion());
                 updateIndexFile(packageInfo.getPackageId(), packageInfo.getVersion());
                 synchronized (packageStatusMap) {
                     packageStatusMap.put(packageInfo.getPackageId(), STATUS_PACKAGE_CANUSE);
@@ -210,7 +212,7 @@ public class PackageManager {
             }
             PackageInfo info = willDownloadPackageInfoList.get(index);
             if (VersionUtils.compareVersion(info.getVersion(), localInfo.getVersion()) <= 0) {
-                if (!checkResourceFileValid(info.getPackageId())) {
+                if (!checkResourceFileValid(info.getPackageId(), info.getVersion())) {
                     return;
                 }
                 willDownloadPackageInfoList.remove(index);
@@ -228,8 +230,8 @@ public class PackageManager {
         }
     }
 
-    private boolean checkResourceFileValid(String packageId) {
-        File indexFile = FileUtils.getResourceIndexFile(context, packageId);
+    private boolean checkResourceFileValid(String packageId, String version) {
+        File indexFile = FileUtils.getResourceIndexFile(context, packageId, version);
         return indexFile.exists() && indexFile.isFile();
     }
 
@@ -371,7 +373,7 @@ public class PackageManager {
                  * 安装失败情况下，不做任何处理，因为资源既然资源需要最新资源，失败了，就没有必要再用缓存了
                  */
                 if (isSuccess) {
-                    resourceManager.updateResource(packageInfo.getPackageId());
+                    resourceManager.updateResource(packageInfo.getPackageId(), packageInfo.getVersion());
                     updateIndexFile(packageInfo.getPackageId(), packageInfo.getVersion());
                     synchronized (packageStatusMap) {
                         packageStatusMap.put(packageId, STATUS_PACKAGE_CANUSE);
@@ -471,7 +473,8 @@ public class PackageManager {
 
         @Override
         public boolean validate(PackageInfo packageInfo) {
-            String downloadFilePath = FileUtils.getPackageDownloadName(context, packageInfo.getPackageId());
+            String downloadFilePath =
+                FileUtils.getPackageDownloadName(context, packageInfo.getPackageId(), packageInfo.getVersion());
             File downloadFile = new File(downloadFilePath);
             if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
                 return true;
@@ -489,7 +492,8 @@ public class PackageManager {
 
         @Override
         public boolean validate(PackageInfo packageInfo) {
-            String downloadFilePath = FileUtils.getPackageAssetsName(context);
+            String downloadFilePath =
+                FileUtils.getPackageAssetsName(context, packageInfo.getPackageId(), packageInfo.getVersion());
             File downloadFile = new File(downloadFilePath);
             if (downloadFile.exists() && MD5Utils.checkMD5(packageInfo.getMd5(), downloadFile)) {
                 return true;
