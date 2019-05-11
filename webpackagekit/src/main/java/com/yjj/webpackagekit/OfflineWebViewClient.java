@@ -31,7 +31,7 @@ public class OfflineWebViewClient extends WebViewClient {
 
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
-        Logger.d("shouldInterceptRequest before" + url);
+        Logger.d("shouldInterceptRequest before: " + url);
         WebResourceResponse resourceResponse = getWebResourceResponse(url);
         if (resourceResponse == null) {
             if (delegate != null) {
@@ -39,7 +39,7 @@ public class OfflineWebViewClient extends WebViewClient {
             }
             return super.shouldInterceptRequest(view, url);
         }
-        Logger.d("shouldInterceptRequest after cache " + url);
+        Logger.d("shouldInterceptRequest after cache: " + url);
         return resourceResponse;
     }
 
@@ -48,6 +48,7 @@ public class OfflineWebViewClient extends WebViewClient {
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         final String url = request.getUrl().toString();
+        Logger.d("shouldInterceptRequest before: " + url);
         WebResourceResponse resourceResponse = getWebResourceResponse(url);
         if (resourceResponse == null) {
             if (delegate != null) {
@@ -55,7 +56,8 @@ public class OfflineWebViewClient extends WebViewClient {
             }
             return super.shouldInterceptRequest(view, url);
         }
-        return super.shouldInterceptRequest(view, request);
+        Logger.d("shouldInterceptRequest after cache: " + url);
+        return resourceResponse;
     }
 
     @Override

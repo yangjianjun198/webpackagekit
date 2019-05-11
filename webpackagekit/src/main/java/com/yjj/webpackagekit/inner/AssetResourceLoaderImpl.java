@@ -80,7 +80,7 @@ public class AssetResourceLoaderImpl implements AssetResourceLoader {
         PackageInfo info = new PackageInfo();
         info.setPackageId(assetEntity.getPackageId());
         info.setStatus(PackageStatus.onLine);
-        info.setVersion(info.getVersion());
+        info.setVersion(assetEntity.getVersion());
         info.setMd5(md5);
         return info;
     }

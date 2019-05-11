@@ -5,9 +5,6 @@ import android.os.Bundle;
 import android.webkit.WebView;
 
 import com.yjj.webpackagekit.OfflineWebViewClient;
-import com.yjj.webpackagekit.core.util.FileUtils;
-
-import java.io.File;
 
 /**
  * created by yangjianjun on 2019/5/7
@@ -22,6 +19,6 @@ public class WebActivity extends Activity {
         setContentView(R.layout.activity_web);
         webView = findViewById(R.id.web);
         webView.setWebViewClient(new OfflineWebViewClient(null));
-        webView.loadUrl("http://www.baidu.com");
+        webView.loadUrl("http://image.baidu.com/search/wiseindex?tn=wiseindex&wiseps=1");
     }
 }

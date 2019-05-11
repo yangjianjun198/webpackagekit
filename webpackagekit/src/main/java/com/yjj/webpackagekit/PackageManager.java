@@ -268,8 +268,9 @@ public class PackageManager {
         }
         PackageInfo packageInfo = new PackageInfo();
         packageInfo.setPackageId(packageId);
-        if (packageInfoList.indexOf(packageInfo) >= 0) {
-            packageInfo.setVersion(version);
+        int index = 0;
+        if ((index = packageInfoList.indexOf(packageInfo)) >= 0) {
+            packageInfoList.get(index).setVersion(version);
         } else {
             packageInfo.setStatus(PackageStatus.onLine);
             packageInfo.setVersion(version);
